@@ -1,0 +1,556 @@
+
+import React, { useState, useCallback } from 'react';
+import { Upload, Download, Eye, FileText, Users, Plus, Trash2 } from 'lucide-react';
+
+const FIA1MarkingApp = () => {
+  const [students, setStudents] = useState([]);
+  const [csvData, setCsvData] = useState('');
+  const [showComments, setShowComments] = useState(false);
+  const [showExportData, setShowExportData] = useState(false);
+  const [exportData, setExportData] = useState('');
+  const [newStudentName, setNewStudentName] = useState('');
+
+  // Recalibrated comment data with correct score ranges
+  const comments = {
+    // Devising comments (0-7)
+    devising: {
+      7: "Exceptional work in devising! You demonstrated the highest level of empathetic design thinking with perceptive, flexible, original ideas that show detailed attributes. To maintain this excellence, continue to challenge conventional thinking and explore even more diverse stakeholder perspectives in future projects.",
+      6: "You excelled in devising ideas! Your ideas were perceptive and demonstrated flexibility in responding to the HCD problem with originality and detailed attributes. To reach the top level, focus on making your ideas even more perceptive and ensure they demonstrate the highest level of empathy for all stakeholders.",
+      5: "Your ideas were purposeful and showed originality with detailed attributes. To improve further, work on making your ideas more perceptive and demonstrate greater flexibility in your ways of responding to the HCD problem. Consider more diverse points-of-view.",
+      4: "Your ideas were purposeful and showed originality with detailed attributes. To reach the next level, you need to ensure your ideas demonstrate more empathy in your response to the HCD problem and show greater variety in your approaches.",
+      3: "You had a range of credible ideas that appropriately used designing with empathy. To improve, focus on making your ideas more purposeful and original, and ensure they have more detailed attributes that clearly address the HCD problem.",
+      2: "You had a range of credible ideas that showed some understanding of designing with empathy. To reach the next level, work on making your ideas more appropriate to the specific HCD problem and ensure they demonstrate clearer empathy for users.",
+      1: "Your ideas were superficial or only described aspects of the HCD problem. To improve significantly, focus on: 1) Creating credible ideas that could actually be implemented, 2) Using designing with empathy to understand user needs, 3) Developing ideas that respond directly to the HCD problem with clear solutions."
+    },
+    // Evaluating and Proposing comments (0-8)
+    evaluating: {
+      8: "Outstanding work! You demonstrated critical evaluation of ideas' strengths, limitations and implications against design criteria, discerning refinement based on criteria and stakeholder information, and proposed a coherent, logical and innovative HCD concept. This represents the highest standard of design thinking.",
+      7: "Excellent evaluation and proposing! You showed critical evaluation against design criteria, discerning refinement based on criteria and stakeholder information, and proposed a coherent, logical and innovative HCD concept. To reach the highest level, ensure your evaluation challenges every aspect of your ideas' credibility.",
+      6: "Good evaluation and proposing work. You conducted feasible evaluation of strengths and limitations against design criteria, made effective refinements, and proposed a logical and credible HCD concept. To improve, work on making your evaluation more critical and your refinements more discerning.",
+      5: "Your evaluation and proposing showed good understanding. You conducted feasible evaluation against design criteria, made effective refinements, and proposed a logical and credible concept. To reach the next level, ensure your evaluation is more thorough and your concept shows greater innovation.",
+      4: "Your evaluation was superficial, touching on some design criteria, and you made changes to ideas with a simple HCD concept proposal. To improve, conduct more thorough evaluation of strengths and limitations, make more effective refinements, and work toward a more logical and credible concept.",
+      3: "Your evaluation remained superficial against some design criteria, with basic changes to ideas and a simple concept proposal. To reach the next level, focus on conducting more feasible evaluation and making your refinements more effective and purposeful.",
+      2: "You made basic statements about ideas related to some design criteria and proposed a partial HCD concept. To improve significantly, work on systematic evaluation of ideas' strengths and limitations, and develop more complete concept proposals that address the full design problem.",
+      1: "You made basic statements about ideas with minimal connection to design criteria and proposed a partial concept. To reach the next level, focus on conducting proper evaluation against clear design criteria and developing more complete HCD concepts."
+    },
+    // Representing comments (0-5)
+    representing: {
+      5: "Outstanding representation work! Your sophisticated visual communication perfectly supported your design development with fluent sequences of ideation and/or schematic sketching that clearly progressed understanding in the develop phase.",
+      4: "Excellent representation! Your sophisticated sketching and ideation sequences were fluent and professional, effectively progressing understanding in the develop phase. To reach the highest level, ensure every visual element contributes meaningfully to developing design understanding.",
+      3: "Good representation work that appropriately communicated your ideas using ideation and/or schematic sketching in the develop phase to progress understanding. To improve, work on making your visual communication more sophisticated and your sketching more fluent.",
+      2: "Your representation was appropriate and helped communicate your ideas using ideation and/or schematic sketching. To reach the next level, focus on ensuring your visual communication more clearly progresses your understanding of ideas throughout the develop phase.",
+      1: "Your visual communication was cursory with unclear ideation and/or schematic sketching. To improve significantly, focus on practicing clearer sketching techniques and using visual communication as a tool for developing and progressing your understanding of design ideas."
+    }
+  };
+
+  const handleFileUpload = useCallback((event) => {
+    console.log('File upload triggered');
+    const file = event.target.files[0];
+    console.log('Selected file:', file);
+    
+    if (file) {
+      console.log('File details:', {
+        name: file.name,
+        size: file.size,
+        type: file.type
+      });
+      
+      // Accept both CSV and TSV files, or any text file
+      if (file.type === 'text/csv' || file.type === 'text/tab-separated-values' || file.type === 'text/plain' || file.name.endsWith('.csv') || file.name.endsWith('.tsv') || file.name.endsWith('.txt')) {
+        console.log('File type accepted, reading file...');
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          console.log('File read successfully');
+          const text = e.target.result;
+          console.log('File content preview:', text.substring(0, 200));
+          setCsvData(text);
+          parseCSV(text);
+        };
+        reader.onerror = (e) => {
+          console.error('File read error:', e);
+        };
+        reader.readAsText(file);
+      } else {
+        console.log('File type not accepted:', file.type);
+        alert('Please upload a CSV, TSV, or TXT file');
+      }
+    } else {
+      console.log('No file selected');
+    }
+  }, []);
+
+  const parseCSV = (csvText) => {
+    console.log('Raw CSV text preview:', csvText.substring(0, 200));
+    const lines = csvText.trim().split('\n');
+    
+    // Function to properly parse CSV line with quoted fields
+    const parseCSVLine = (line) => {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim()); // Add the last field
+      return result;
+    };
+    
+    const parsedStudents = lines.slice(1).map((line, index) => {
+      console.log(`\n--- Processing line ${index + 1}: "${line}"`);
+      
+      // Skip empty lines or summary lines
+      if (!line.trim() || line.includes('Students in Class')) {
+        console.log('Skipping empty or summary line');
+        return null;
+      }
+      
+      const values = parseCSVLine(line);
+      console.log('Properly parsed values:', values);
+      console.log('Number of values:', values.length);
+      
+      const student = {
+        name: '',
+        id: '',
+        devising: 1,
+        evaluating: 1,
+        representing: 1,
+        index: index
+      };
+      
+      // Handle the specific format: StudentID, "Surname, Firstname", Year
+      if (values.length >= 2) {
+        // First column is Student ID
+        student.id = values[0] || '';
+        console.log('Set student ID to:', student.id);
+        
+        // Second column is "Surname, Firstname"
+        const nameValue = values[1] || '';
+        console.log('Raw name value:', `"${nameValue}"`);
+        console.log('Name value contains comma:', nameValue.includes(','));
+        
+        if (nameValue.includes(',')) {
+          const nameParts = nameValue.split(',');
+          console.log('Name parts before trim:', nameParts);
+          const trimmedParts = nameParts.map(part => part.trim());
+          console.log('Name parts after trim:', trimmedParts);
+          
+          if (trimmedParts.length >= 2 && trimmedParts[1]) {
+            student.name = `${trimmedParts[1]} ${trimmedParts[0]}`; // Convert to "Firstname Surname"
+            console.log('Final converted name:', `"${student.name}"`);
+          } else {
+            student.name = nameValue;
+            console.log('Using original name (insufficient parts):', `"${student.name}"`);
+          }
+        } else {
+          student.name = nameValue;
+          console.log('Using original name (no comma):', `"${student.name}"`);
+        }
+      } else {
+        console.log('Not enough values in line, skipping');
+        return null;
+      }
+      
+      console.log('Final student object:', student);
+      return student;
+    }).filter(student => student && student.name.trim() !== '');
+    
+    console.log('Final parsed students array:', parsedStudents);
+    setStudents(parsedStudents);
+  };
+
+  const addStudent = () => {
+    if (newStudentName.trim()) {
+      const newStudent = {
+        name: newStudentName.trim(),
+        id: '',
+        devising: 1,
+        evaluating: 1,
+        representing: 1,
+        index: students.length
+      };
+      setStudents([...students, newStudent]);
+      setNewStudentName('');
+    }
+  };
+
+  const removeStudent = (index) => {
+    setStudents(students.filter((_, i) => i !== index));
+  };
+
+  const updateScore = (studentIndex, category, newScore) => {
+    const updatedStudents = [...students];
+    updatedStudents[studentIndex][category] = newScore;
+    setStudents(updatedStudents);
+  };
+
+  const generateCombinedComment = (student) => {
+    const devisingComment = comments.devising[student.devising] || "";
+    const evaluatingComment = comments.evaluating[student.evaluating] || "";
+    const representingComment = comments.representing[student.representing] || "";
+    
+    // Create separate paragraphs for each section
+    let combinedComment = "";
+    
+    if (devisingComment) {
+      combinedComment += `**Devising (${student.devising}/7):**\n${devisingComment}\n\n`;
+    }
+    
+    if (evaluatingComment) {
+      combinedComment += `**Evaluating and Proposing (${student.evaluating}/8):**\n${evaluatingComment}\n\n`;
+    }
+    
+    if (representingComment) {
+      combinedComment += `**Representing (${student.representing}/5):**\n${representingComment}`;
+    }
+    
+    return combinedComment.trim();
+  };
+
+  const exportResults = () => {
+    // Create CSV header
+    let csvContent = "Name,Student ID,Devising (1-7),Evaluating and Proposing (1-8),Representing (1-5),Total,Combined Feedback\n";
+    
+    // Add each student's data
+    students.forEach(student => {
+      const total = student.devising + student.evaluating + student.representing;
+      const combinedComment = generateCombinedComment(student);
+      
+      // Clean up the comment for CSV (remove markdown formatting and extra spaces)
+      const cleanComment = combinedComment
+        .replace(/\*\*/g, '') // Remove markdown bold
+        .replace(/\n\n/g, ' | ') // Replace double newlines with separators
+        .replace(/\n/g, ' ') // Replace single newlines with spaces
+        .replace(/"/g, '""'); // Escape quotes for CSV
+      
+      csvContent += `"${student.name || ''}","${student.id || ''}",${student.devising},${student.evaluating},${student.representing},${total},"${cleanComment}"\n`;
+    });
+    
+    // Create and trigger download
+    try {
+      // Add BOM for Excel compatibility
+      const BOM = '\uFEFF';
+      const fullContent = BOM + csvContent;
+      
+      const blob = new Blob([fullContent], { 
+        type: 'text/csv;charset=utf-8;' 
+      });
+      
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `FIA1_Results_${new Date().toISOString().split('T')[0]}.csv`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+      
+      console.log('Export completed successfully');
+      alert('Export completed! Check your Downloads folder.');
+      
+    } catch (error) {
+      console.error('Export failed:', error);
+      
+      // Fallback method - copy to clipboard
+      try {
+        navigator.clipboard.writeText(csvContent).then(() => {
+          alert('Export failed, but CSV data has been copied to your clipboard. You can paste it into Excel or a text editor.');
+        });
+      } catch (clipboardError) {
+        console.error('Clipboard fallback also failed:', clipboardError);
+        alert('Export failed. Please try again or use a different browser.');
+      }
+    }
+  };
+
+  const ScoreSlider = ({ label, value, max, onChange, studentIndex, category, color = "blue" }) => (
+    <div className="flex flex-col space-y-2">
+      <label className="text-sm font-medium flex justify-between" style={{color: '#002954'}}>
+        <span>{label}</span>
+        <span className={`font-bold`} style={{color: color === 'blue' ? '#002954' : color === 'green' ? '#002954' : '#002954'}}>{value}/{max}</span>
+      </label>
+      <input
+        type="range"
+        min="1"
+        max={max}
+        value={value}
+        onChange={(e) => onChange(studentIndex, category, parseInt(e.target.value))}
+        className={`w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider-${color}`}
+      />
+      <div className="flex justify-between text-xs text-gray-500">
+        <span>1</span>
+        <span>{max}</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen p-6" style={{backgroundColor: '#002954'}}>
+      <style jsx>{`
+        .slider-blue::-webkit-slider-thumb { background: #3b82f6; }
+        .slider-green::-webkit-slider-thumb { background: #10b981; }
+        .slider-purple::-webkit-slider-thumb { background: #8b5cf6; }
+        .slider-blue::-moz-range-thumb { background: #3b82f6; }
+        .slider-green::-moz-range-thumb { background: #10b981; }
+        .slider-purple::-moz-range-thumb { background: #8b5cf6; }
+      `}</style>
+      
+      <div className="max-w-7xl mx-auto">
+        <div className="rounded-lg shadow-lg p-6 mb-6" style={{backgroundColor: '#a3bddb'}}>
+          <h1 className="text-3xl font-bold mb-2 flex items-center" style={{color: '#002954'}}>
+            <FileText className="mr-3 text-blue-600" />
+            FIA1 Assessment Marking App - Recalibrated
+          </h1>
+          <p className="mb-2" style={{color: '#002954'}}>Upload student list or add manually. Use sliders to assign marks and generate personalized feedback.</p>
+          <div className="mt-4 text-sm p-3 rounded" style={{backgroundColor: '#ffe880', color: '#002954'}}>
+            <strong>Scoring Ranges:</strong> Devising (1-7) • Evaluating and Proposing (1-8) • Representing (1-5) • Score 0 = Exemption
+          </div>
+        </div>
+
+        {/* File Upload and Manual Add Section */}
+        <div className="grid md:grid-cols-2 gap-6 mb-6">
+          <div className="rounded-lg shadow-lg p-6" style={{backgroundColor: '#a3bddb'}}>
+            <h2 className="text-xl font-semibold mb-4 flex items-center" style={{color: '#002954'}}>
+              <Upload className="mr-2" style={{color: '#002954'}} />
+              Upload Student List
+            </h2>
+            <div className="border-2 border-dashed rounded-lg p-4 text-center" style={{borderColor: '#002954'}}>
+              <input
+                type="file"
+                accept=".csv,.tsv,.txt"
+                onChange={handleFileUpload}
+                className="hidden"
+                id="csvUpload"
+              />
+              <label htmlFor="csvUpload" className="cursor-pointer">
+                <Upload className="mx-auto h-8 w-8 mb-2" style={{color: '#002954'}} />
+                <div className="text-sm" style={{color: '#002954'}}>
+                  <span className="font-medium" style={{color: '#ffe880'}}>Upload CSV</span> with student names
+                </div>
+
+            {/* Export Data Display */}
+            {showExportData && (
+              <div className="mt-6 p-6 rounded" style={{backgroundColor: 'white', border: '2px solid #002954'}}>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-bold" style={{color: '#002954'}}>📋 Your Export Data</h3>
+                  <button
+                    onClick={() => setShowExportData(false)}
+                    className="text-white px-4 py-2 rounded"
+                    style={{backgroundColor: '#002954'}}
+                  >
+                    ✕ Close
+                  </button>
+                </div>
+                
+                <div className="mb-4 p-3 rounded" style={{backgroundColor: '#ffe880'}}>
+                  <p className="font-semibold" style={{color: '#002954'}}>
+                    📝 Instructions:
+                  </p>
+                  <ol className="list-decimal list-inside text-sm mt-2" style={{color: '#002954'}}>
+                    <li>Click anywhere in the text box below</li>
+                    <li>Press Ctrl+A (Windows) or Cmd+A (Mac) to select all</li>
+                    <li>Press Ctrl+C (Windows) or Cmd+C (Mac) to copy</li>
+                    <li>Open Excel and paste (Ctrl+V or Cmd+V)</li>
+                  </ol>
+                </div>
+
+                <div className="border-2 p-4 rounded" style={{borderColor: '#002954', backgroundColor: '#f8f9fa'}}>
+                  <p className="text-sm font-semibold mb-2" style={{color: '#002954'}}>CSV Data (click to select):</p>
+                  <pre
+                    className="text-xs overflow-auto max-h-96 p-3 rounded cursor-text"
+                    style={{backgroundColor: 'white', border: '1px solid #ccc'}}
+                    onClick={(e) => {
+                      const range = document.createRange();
+                      range.selectNodeContents(e.target);
+                      const selection = window.getSelection();
+                      selection.removeAllRanges();
+                      selection.addRange(range);
+                    }}
+                  >
+{exportData}
+                  </pre>
+                </div>
+              </div>
+            )}
+              </label>
+            </div>
+          </div>
+
+          <div className="rounded-lg shadow-lg p-6" style={{backgroundColor: '#a3bddb'}}>
+            <h2 className="text-xl font-semibold mb-4 flex items-center" style={{color: '#002954'}}>
+              <Plus className="mr-2" style={{color: '#002954'}} />
+              Add Student Manually
+            </h2>
+            <div className="flex space-x-2">
+              <input
+                type="text"
+                placeholder="Student name"
+                value={newStudentName}
+                onChange={(e) => setNewStudentName(e.target.value)}
+                className="flex-1 border rounded px-3 py-2 focus:outline-none focus:ring-2" 
+                style={{borderColor: '#002954', backgroundColor: 'white'}}
+                onKeyPress={(e) => e.key === 'Enter' && addStudent()}
+              />
+              <button
+                onClick={addStudent}
+                className="text-white px-4 py-2 rounded transition-colors"
+                style={{backgroundColor: '#002954'}}
+                onMouseOver={(e) => e.target.style.backgroundColor = '#ffe880'}
+                onMouseOut={(e) => e.target.style.backgroundColor = '#002954'}
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Students Marking Section */}
+        {students.length > 0 && (
+          <div className="rounded-lg shadow-lg p-6 mb-6" style={{backgroundColor: '#a3bddb'}}>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold flex items-center" style={{color: '#002954'}}>
+                <Users className="mr-2" style={{color: '#002954'}} />
+                Students ({students.length})
+              </h2>
+              <div className="space-x-2">
+                <button
+                  onClick={() => setShowComments(!showComments)}
+                  className="text-white px-4 py-2 rounded transition-colors flex items-center mr-2"
+                  style={{backgroundColor: '#002954'}}
+                  onMouseOver={(e) => e.target.style.backgroundColor = '#ffe880'}
+                  onMouseOut={(e) => e.target.style.backgroundColor = '#002954'}
+                >
+                  <Eye className="mr-2 w-4 h-4" />
+                  {showComments ? 'Hide' : 'Show'} Comments
+                </button>
+                <button
+                  onClick={exportResults}
+                  className="text-white px-4 py-2 rounded transition-colors flex items-center"
+                  style={{backgroundColor: '#ffe880', color: '#002954'}}
+                  onMouseOver={(e) => {e.target.style.backgroundColor = '#002954'; e.target.style.color = 'white';}}
+                  onMouseOut={(e) => {e.target.style.backgroundColor = '#ffe880'; e.target.style.color = '#002954';}}
+                >
+                  <Download className="mr-2 w-4 h-4" />
+                  Export to CSV File
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              {students.map((student, index) => {
+                const total = student.devising + student.evaluating + student.representing;
+                const combinedComment = generateCombinedComment(student);
+                
+                return (
+                  <div key={index} className="border rounded-lg p-6" style={{borderColor: '#002954', backgroundColor: 'white'}}>
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold" style={{color: '#002954'}}>{student.name}</h3>
+                        {student.id && <p className="text-sm" style={{color: '#002954'}}>ID: {student.id}</p>}
+                        <p className="text-sm font-medium mt-1" style={{color: '#002954'}}>
+                          Total Score: <span className="text-xl font-bold" style={{color: '#ffe880'}}>{total}</span>/20
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => removeStudent(index)}
+                        className="p-1" 
+                        style={{color: '#002954'}}
+                        title="Remove student"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="grid md:grid-cols-3 gap-6 mb-4">
+                      <ScoreSlider
+                        label="Devising"
+                        value={student.devising}
+                        max={7}
+                        onChange={updateScore}
+                        studentIndex={index}
+                        category="devising"
+                        color="blue"
+                      />
+                      <ScoreSlider
+                        label="Evaluating & Proposing"
+                        value={student.evaluating}
+                        max={8}
+                        onChange={updateScore}
+                        studentIndex={index}
+                        category="evaluating"
+                        color="green"
+                      />
+                      <ScoreSlider
+                        label="Representing"
+                        value={student.representing}
+                        max={5}
+                        onChange={updateScore}
+                        studentIndex={index}
+                        category="representing"
+                        color="purple"
+                      />
+                    </div>
+
+                    {showComments && (
+                      <div className="mt-4 p-4 rounded border" style={{backgroundColor: '#a3bddb', borderColor: '#002954'}}>
+                        <h4 className="font-semibold mb-3" style={{color: '#002954'}}>Combined Feedback:</h4>
+                        <div className="prose prose-sm max-w-none">
+                          {combinedComment.split('\n\n').map((section, i) => {
+                            const lines = section.split('\n');
+                            if (lines[0] && lines[0].startsWith('**')) {
+                              const header = lines[0].replace(/\*\*/g, '');
+                              const content = lines.slice(1).join('\n');
+                              return (
+                                <div key={i} className="mb-4">
+                                  <h5 className="font-semibold mb-2" style={{color: '#002954'}}>{header}</h5>
+                                  <p className="leading-relaxed" style={{color: '#002954'}}>{content}</p>
+                                </div>
+                              );
+                            }
+                            return <p key={i} className="mb-3 leading-relaxed" style={{color: '#002954'}}>{section}</p>;
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Sample CSV Format */}
+        <div className="rounded-lg shadow-lg p-6" style={{backgroundColor: '#a3bddb'}}>
+          <h3 className="text-lg font-semibold mb-3" style={{color: '#002954'}}>Sample CSV Format</h3>
+          <div className="p-4 rounded font-mono text-sm overflow-x-auto" style={{backgroundColor: 'white', color: '#002954'}}>
+            <pre>
+{`Student ID	Name	Year
+8150	Barr, Alexandra	11
+8151	Smith, John	11
+8152	Wilson, Sarah	11`}
+            </pre>
+          </div>
+          <p className="text-sm mt-2" style={{color: '#002954'}}>
+            Tab-separated format with "Surname, Firstname" will be automatically converted to "Firstname Surname" for display.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default FIA1MarkingApp;
